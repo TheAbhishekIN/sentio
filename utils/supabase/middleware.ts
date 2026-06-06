@@ -34,14 +34,14 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const isPublicRoute =
-    pathname.startsWith('/login') || pathname.startsWith('/auth')
+    pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/auth')
 
   if (!user && !isPublicRoute && !pathname.startsWith('/api')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
   if (user && pathname.startsWith('/login')) {
-    return NextResponse.redirect(new URL('/', request.url))
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   return supabaseResponse

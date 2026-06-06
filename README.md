@@ -2,6 +2,8 @@
 
 Daily mood check-ins for Indian students preparing for competitive exams (JEE, NEET, CUET, CAT, GATE, UPSC, board exams).
 
+**Live app:** [https://sentio-53q.pages.dev](https://sentio-53q.pages.dev)
+
 ## Stack
 
 - **Next.js 14** (App Router, Edge Runtime) + Tailwind (Linear dark design system)
@@ -35,6 +37,8 @@ Open [http://localhost:3000](http://localhost:3000).
 2. **Alternative:** Supabase Dashboard → Authentication → Email → disable **Confirm email**.
 
 ## Cloudflare Pages deployment
+
+**Production URL:** [https://sentio-53q.pages.dev](https://sentio-53q.pages.dev)
 
 All API routes use the **Edge Runtime** (required for Cloudflare Workers). Gemini calls use `fetch` only — no Node.js `fs` at runtime.
 

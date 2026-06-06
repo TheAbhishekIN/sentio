@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { AppShell } from '@/components/layout/AppShell'
 import {
   BurnoutAlert,
@@ -19,8 +20,15 @@ import Link from 'next/link'
 import { SkeletonCard } from '@/components/ui/LoadingOverlay'
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { user } = useAuth()
   const { data: profile } = useProfile(user?.id)
+
+  useEffect(() => {
+    if (profile && !profile.onboardingComplete) {
+      router.replace('/onboarding')
+    }
+  }, [profile, router])
   const today = todayISO()
   const { data: todayCheckin } = useTodayCheckin(user?.id, today)
   const { data: recentCheckins = [] } = useRecentCheckins(user?.id, 7)
