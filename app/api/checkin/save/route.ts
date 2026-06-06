@@ -3,9 +3,9 @@ import { callAI } from '@/lib/ai'
 import { getProfile, updateStreak } from '@/lib/db/profiles'
 import { getCheckinByDate, upsertCheckin, updateAiReflection } from '@/lib/db/checkins'
 import { buildJournalReflectionPrompt } from '@/lib/prompts'
+import { genericApiError, parseCheckinBody } from '@/lib/security'
 import { createClient } from '@/utils/supabase/server'
-import { calcStreak, todayISO } from '@/lib/utils'
-import type { CheckinFormData } from '@/lib/types'
+import { calcStreak } from '@/lib/utils'
 
 export const runtime = 'edge'
 
@@ -21,8 +21,12 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = (await req.json()) as CheckinFormData & { checkinDate?: string }
-    const checkinDate = body.checkinDate ?? todayISO()
+    const parsed = parseCheckinBody(await req.json())
+    if (!parsed) {
+      return Response.json({ error: 'Invalid check-in data' }, { status: 400 })
+    }
+
+    const { checkinDate, ...form } = parsed
 
     const existing = await getCheckinByDate(supabase, user.id, checkinDate)
     const profile = await getProfile(supabase, user.id)
@@ -30,14 +34,14 @@ export async function POST(req: Request) {
     const checkin = await upsertCheckin(supabase, {
       userId: user.id,
       checkinDate,
-      moodScore: body.moodScore,
-      energyLevel: body.energyLevel,
-      anxietyLevel: body.anxietyLevel,
-      triggers: body.triggers,
-      journalEntry: body.journalEntry,
-      gratitudeNote: body.gratitudeNote,
-      studyHours: body.studyHours,
-      sleepHours: body.sleepHours,
+      moodScore: form.moodScore,
+      energyLevel: form.energyLevel,
+      anxietyLevel: form.anxietyLevel,
+      triggers: form.triggers,
+      journalEntry: form.journalEntry,
+      gratitudeNote: form.gratitudeNote,
+      studyHours: form.studyHours,
+      sleepHours: form.sleepHours,
     })
 
     let streakCount = profile?.streakCount ?? 0
@@ -51,7 +55,7 @@ export async function POST(req: Request) {
 
     let aiReflection: string | null = null
 
-    if (profile?.aiEnabled && body.journalEntry.length > 30) {
+    if (profile?.aiEnabled && form.journalEntry.length > 30) {
       try {
         const messages = [
           {
@@ -65,18 +69,18 @@ export async function POST(req: Request) {
               name: profile.name,
               exam: profile.exam,
               phase: profile.phase,
-              moodScore: body.moodScore,
-              anxietyLevel: body.anxietyLevel,
-              energyLevel: body.energyLevel,
-              triggers: body.triggers,
-              journalEntry: body.journalEntry,
-              studyHours: body.studyHours,
-              sleepHours: body.sleepHours,
+              moodScore: form.moodScore,
+              anxietyLevel: form.anxietyLevel,
+              energyLevel: form.energyLevel,
+              triggers: form.triggers,
+              journalEntry: form.journalEntry,
+              studyHours: form.studyHours,
+              sleepHours: form.sleepHours,
             }),
           },
         ]
         aiReflection = await callAI(messages, { maxTokens: 200 })
-        await updateAiReflection(supabase, checkin.id, aiReflection)
+        await updateAiReflection(supabase, user.id, checkin.id, aiReflection)
       } catch {
         aiReflection = null
       }
@@ -88,7 +92,7 @@ export async function POST(req: Request) {
       aiReflection,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return Response.json({ error: message }, { status: 500 })
+    console.error('Checkin save error:', err)
+    return Response.json({ error: genericApiError() }, { status: 500 })
   }
 }

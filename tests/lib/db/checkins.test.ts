@@ -79,11 +79,11 @@ describe('db/checkins', () => {
     expect(result.id).toBe('c1')
   })
 
-  it('updateAiReflection updates row', async () => {
-    const eq = vi.fn(async () => ({ error: null }))
+  it('updateAiReflection updates row scoped to user', async () => {
+    const eq = vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) }))
     const update = vi.fn(() => ({ eq }))
     const supabase = { from: vi.fn(() => ({ update })) }
-    await updateAiReflection(supabase as never, 'c1', 'Nice reflection')
+    await updateAiReflection(supabase as never, 'u1', 'c1', 'Nice reflection')
     expect(update).toHaveBeenCalledWith({ ai_reflection: 'Nice reflection' })
   })
 
@@ -152,9 +152,10 @@ describe('db/checkins', () => {
   })
 
   it('updateAiReflection throws on error', async () => {
-    const eq = vi.fn(async () => ({ error: new Error('update fail') }))
-    const update = vi.fn(() => ({ eq }))
+    const eq2 = vi.fn(async () => ({ error: new Error('update fail') }))
+    const eq1 = vi.fn(() => ({ eq: eq2 }))
+    const update = vi.fn(() => ({ eq: eq1 }))
     const supabase = { from: vi.fn(() => ({ update })) }
-    await expect(updateAiReflection(supabase as never, 'c1', 'text')).rejects.toThrow('update fail')
+    await expect(updateAiReflection(supabase as never, 'u1', 'c1', 'text')).rejects.toThrow('update fail')
   })
 })

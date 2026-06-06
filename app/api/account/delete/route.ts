@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import { genericApiError } from '@/lib/security'
 import { createClient, createServiceClient } from '@/utils/supabase/server'
 
 export const runtime = 'edge'
@@ -31,7 +32,7 @@ export async function POST() {
 
     return Response.json({ success: true })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return Response.json({ error: message }, { status: 500 })
+    console.error('Account delete error:', err)
+    return Response.json({ error: genericApiError() }, { status: 500 })
   }
 }

@@ -119,6 +119,7 @@ export async function upsertCheckin(
 
 export async function updateAiReflection(
   supabase: SupabaseClient,
+  userId: string,
   checkinId: string,
   reflection: string
 ): Promise<void> {
@@ -126,6 +127,7 @@ export async function updateAiReflection(
     .from('mood_checkins')
     .update({ ai_reflection: reflection })
     .eq('id', checkinId)
+    .eq('user_id', userId)
 
   if (error) throw error
 }

@@ -24,6 +24,7 @@ describe('POST /api/auth/signup', () => {
       ...originalEnv,
       NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'pub-key',
+      SIGNUP_FUNCTION_SECRET: 'signup-secret',
     }
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
     mockUpsertProfile.mockResolvedValue({})
@@ -39,11 +40,22 @@ describe('POST /api/auth/signup', () => {
     expect(res.status).toBe(400)
   })
 
+  it('returns 400 when password too short', async () => {
+    const res = await POST(
+      new Request('http://x', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'a@b.com', password: 'short', name: 'Aarav' }),
+      })
+    )
+    expect(res.status).toBe(400)
+    expect((await jsonBody<{ error: string }>(res)).error).toContain('8 characters')
+  })
+
   it('returns 400 when name blank', async () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: '   ' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: '   ' }),
       })
     )
     expect(res.status).toBe(400)
@@ -62,7 +74,7 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(200)
@@ -86,7 +98,7 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(409)
@@ -99,7 +111,7 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(500)
@@ -112,7 +124,7 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(500)
@@ -135,7 +147,7 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(200)
@@ -160,7 +172,7 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(409)
@@ -206,7 +218,7 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(500)
@@ -220,11 +232,11 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(500)
-    expect((await jsonBody<{ error: string }>(res)).error).toBe('boom')
+    expect((await jsonBody<{ error: string }>(res)).error).toBe('Signup failed')
   })
 
   it('returns 401 when sign-in fails after create', async () => {
@@ -245,7 +257,7 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(401)
@@ -272,7 +284,7 @@ describe('POST /api/auth/signup', () => {
     await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(order).toEqual(['signIn', 'upsert'])
@@ -288,7 +300,7 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(503)
@@ -303,7 +315,7 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(500)
@@ -322,7 +334,7 @@ describe('POST /api/auth/signup', () => {
     const res = await POST(
       new Request('http://x', {
         method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com', password: 'secret', name: 'Aarav' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 'secret12', name: 'Aarav' }),
       })
     )
     expect(res.status).toBe(200)

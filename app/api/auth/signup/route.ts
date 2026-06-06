@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { upsertProfile } from '@/lib/db/profiles'
 import { mapAuthError } from '@/lib/auth-errors'
+import { genericApiError, validateSignupPassword } from '@/lib/security'
 import { createClient, createServiceClient } from '@/utils/supabase/server'
 
 export const runtime = 'edge'
@@ -46,11 +47,17 @@ async function createUserViaEdgeFunction(
     return { error: 'Server configuration error', status: 500 }
   }
 
+  const signupSecret = process.env.SIGNUP_FUNCTION_SECRET
+  if (!signupSecret) {
+    return { error: 'Server configuration error', status: 500 }
+  }
+
   const res = await fetch(`${supabaseUrl}/functions/v1/auth-signup`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${publishableKey}`,
+      'X-Signup-Secret': signupSecret,
     },
     body: JSON.stringify({ email, password, name }),
   })
@@ -101,8 +108,13 @@ export async function POST(req: Request) {
     const { email, password, name } = await req.json()
     const trimmedName = typeof name === 'string' ? name.trim() : ''
 
-    if (!email || !password) {
+    if (!email || typeof email !== 'string') {
       return Response.json({ error: 'Email and password are required' }, { status: 400 })
+    }
+
+    const validPassword = validateSignupPassword(password)
+    if (!validPassword) {
+      return Response.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
     }
 
     if (!trimmedName) {
@@ -113,16 +125,16 @@ export async function POST(req: Request) {
     const supabase = createClient(cookieStore)
 
     const created = process.env.SUPABASE_SERVICE_ROLE_KEY
-      ? await createUserWithAdmin(email, password, trimmedName)
-      : await createUserViaEdgeFunction(email, password, trimmedName)
+      ? await createUserWithAdmin(email, validPassword, trimmedName)
+      : await createUserViaEdgeFunction(email, validPassword, trimmedName)
 
     if ('error' in created) {
       return Response.json({ error: created.error }, { status: created.status })
     }
 
-    return await signInAndRespond(supabase, email, password, created.userId, trimmedName)
+    return await signInAndRespond(supabase, email, validPassword, created.userId, trimmedName)
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Signup failed'
-    return Response.json({ error: message }, { status: 500 })
+    console.error('Signup error:', err)
+    return Response.json({ error: genericApiError('Signup failed') }, { status: 500 })
   }
 }

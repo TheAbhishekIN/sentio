@@ -1,15 +1,18 @@
 import { cookies } from 'next/headers'
 import { callAI } from '@/lib/ai'
 import { calculateBurnoutScore } from '@/lib/burnout'
+import { getRecentCheckins } from '@/lib/db/checkins'
 import { upsertInsight } from '@/lib/db/insights'
+import { getProfile } from '@/lib/db/profiles'
 import { buildWeeklyInsightPrompt } from '@/lib/prompts'
+import { genericApiError } from '@/lib/security'
 import { createClient } from '@/utils/supabase/server'
 import { avg, getWeekOf } from '@/lib/utils'
-import type { MoodCheckin, StressTrigger } from '@/lib/types'
+import type { StressTrigger } from '@/lib/types'
 
 export const runtime = 'edge'
 
-export async function POST(req: Request) {
+export async function POST() {
   try {
     const cookieStore = await cookies()
     const supabase = createClient(cookieStore)
@@ -21,10 +24,15 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { checkins } = (await req.json()) as { checkins: MoodCheckin[] }
+    const profile = await getProfile(supabase, user.id)
+    if (!profile?.aiEnabled) {
+      return Response.json({ error: 'AI is disabled in Settings' }, { status: 403 })
+    }
 
-    if (!checkins?.length) {
-      return Response.json({ error: 'No check-ins provided' }, { status: 400 })
+    const checkins = await getRecentCheckins(supabase, user.id, 7)
+
+    if (!checkins.length) {
+      return Response.json({ error: 'No check-ins found for this week' }, { status: 400 })
     }
 
     const { score, risk } = calculateBurnoutScore(checkins)
@@ -72,7 +80,7 @@ export async function POST(req: Request) {
 
     return Response.json({ insight, recommendations, burnoutScore: score, burnoutRisk: risk })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return Response.json({ error: message }, { status: 500 })
+    console.error('Weekly insight error:', err)
+    return Response.json({ error: genericApiError() }, { status: 500 })
   }
 }

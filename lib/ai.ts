@@ -75,10 +75,7 @@ export async function callAI(
   const model = options.model ?? defaultModel
   const maxTokens = options.maxTokens ?? 2048
 
-  const url = new URL(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-  )
-  url.searchParams.set('key', apiKey)
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
   const res = await fetch(url, {
     method: 'POST',

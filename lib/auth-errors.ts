@@ -21,5 +21,5 @@ export function mapAuthError(message: string): string {
     return 'Password is too weak. Use at least 6 characters.'
   }
 
-  return message
+  return 'Something went wrong. Please try again.'
 }

@@ -25,7 +25,7 @@ describe('mapAuthError', () => {
     expect(mapAuthError('Password is too weak')).toContain('too weak')
   })
 
-  it('returns original message when unmatched', () => {
-    expect(mapAuthError('Something unexpected')).toBe('Something unexpected')
+  it('returns generic message when unmatched', () => {
+    expect(mapAuthError('Something unexpected')).toBe('Something went wrong. Please try again.')
   })
 })

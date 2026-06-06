@@ -91,11 +91,7 @@ export default function InsightsPage() {
   async function generateWeeklyInsight() {
     setGenerating(true)
     try {
-      const res = await fetch('/api/ai/weekly-insight', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ checkins: weekCheckins }),
-      })
+      const res = await fetch('/api/ai/weekly-insight', { method: 'POST' })
       const data = await res.json()
       if (!res.ok) {
         showToast(data.error ?? 'Could not generate insight', 'error')

@@ -3,27 +3,14 @@ import { callAI, type ChatMessage } from '@/lib/ai'
 import { getInsightByWeek } from '@/lib/db/insights'
 import { getProfile } from '@/lib/db/profiles'
 import {
-  countUserMessages,
-  MAX_INSIGHT_CHAT_MESSAGE_LENGTH,
   MAX_INSIGHT_CHAT_USER_MESSAGES,
   type InsightChatMessage,
 } from '@/lib/insight-chat'
 import { buildInsightChatSystemPrompt } from '@/lib/prompts'
+import { genericApiError, sanitizeInsightChatMessages } from '@/lib/security'
 import { createClient } from '@/utils/supabase/server'
 
 export const runtime = 'edge'
-
-function parseMessages(raw: unknown): InsightChatMessage[] {
-  if (!Array.isArray(raw)) return []
-  return raw.filter(
-    (m): m is InsightChatMessage =>
-      typeof m === 'object' &&
-      m !== null &&
-      (m.role === 'user' || m.role === 'assistant') &&
-      typeof m.content === 'string' &&
-      m.content.length <= MAX_INSIGHT_CHAT_MESSAGE_LENGTH
-  )
-}
 
 export async function POST(req: Request) {
   try {
@@ -39,7 +26,7 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const weekOf = typeof body.weekOf === 'string' ? body.weekOf.trim() : ''
-    const messages = parseMessages(body.messages)
+    const messages: InsightChatMessage[] = sanitizeInsightChatMessages(body.messages)
 
     if (!weekOf) {
       return Response.json({ error: 'Missing weekOf' }, { status: 400 })
@@ -55,7 +42,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'No insight found for this week' }, { status: 404 })
     }
 
-    const userMessageCount = countUserMessages(messages)
+    const userMessageCount = messages.length
     if (userMessageCount > MAX_INSIGHT_CHAT_USER_MESSAGES) {
       return Response.json(
         { error: `Message limit reached (${MAX_INSIGHT_CHAT_USER_MESSAGES} per week)` },
@@ -64,8 +51,8 @@ export async function POST(req: Request) {
     }
 
     const last = messages.at(-1)
-    if (!last || last.role !== 'user') {
-      return Response.json({ error: 'Last message must be from user' }, { status: 400 })
+    if (!last) {
+      return Response.json({ error: 'Message cannot be empty' }, { status: 400 })
     }
 
     if (!last.content.trim()) {
@@ -78,7 +65,7 @@ export async function POST(req: Request) {
         content: buildInsightChatSystemPrompt({ profile, insight }),
       },
       ...messages.map((m) => ({
-        role: m.role as 'user' | 'assistant',
+        role: 'user' as const,
         content: m.content,
       })),
     ]
@@ -91,7 +78,7 @@ export async function POST(req: Request) {
       userMessagesRemaining: MAX_INSIGHT_CHAT_USER_MESSAGES - userMessageCount,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return Response.json({ error: message }, { status: 500 })
+    console.error('Insight chat error:', err)
+    return Response.json({ error: genericApiError() }, { status: 500 })
   }
 }

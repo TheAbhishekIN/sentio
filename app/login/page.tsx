@@ -125,7 +125,7 @@ function LoginForm() {
               id="password"
               type="password"
               required
-              minLength={6}
+              minLength={8}
               autoComplete={isSignUp ? 'new-password' : 'current-password'}
               className="input"
               value={password}

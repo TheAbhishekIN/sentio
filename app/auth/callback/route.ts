@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import { getProfile, upsertProfile } from '@/lib/db/profiles'
+import { safeRedirectPath } from '@/lib/security'
 import { NextResponse } from 'next/server'
 
 export const runtime = 'edge'
@@ -13,7 +14,7 @@ function nameFromUser(user: { user_metadata?: Record<string, unknown> }): string
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  const next = safeRedirectPath(searchParams.get('next'))
 
   if (code) {
     const cookieStore = await cookies()

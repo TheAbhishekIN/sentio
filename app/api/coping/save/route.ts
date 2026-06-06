@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { saveCopingSession } from '@/lib/db/insights'
+import { genericApiError, parseCopingSessionBody } from '@/lib/security'
 import { createClient } from '@/utils/supabase/server'
 
 export const runtime = 'edge'
@@ -16,19 +17,19 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await req.json()
+    const session = parseCopingSessionBody(await req.json())
+    if (!session) {
+      return Response.json({ error: 'Invalid session data' }, { status: 400 })
+    }
 
     await saveCopingSession(supabase, {
       userId: user.id,
-      toolId: body.toolId,
-      durationSecs: body.durationSecs ?? 0,
-      moodBefore: body.moodBefore,
-      moodAfter: body.moodAfter,
+      ...session,
     })
 
     return Response.json({ success: true })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return Response.json({ error: message }, { status: 500 })
+    console.error('Coping save error:', err)
+    return Response.json({ error: genericApiError() }, { status: 500 })
   }
 }
