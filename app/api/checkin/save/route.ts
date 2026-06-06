@@ -7,7 +7,7 @@ import { createClient } from '@/utils/supabase/server'
 import { calcStreak, todayISO } from '@/lib/utils'
 import type { CheckinFormData } from '@/lib/types'
 
-export const runtime = 'nodejs'
+export const runtime = 'edge'
 
 export async function POST(req: Request) {
   try {

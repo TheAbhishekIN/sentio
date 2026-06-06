@@ -7,7 +7,7 @@ import { createClient } from '@/utils/supabase/server'
 import { avg, getWeekOf } from '@/lib/utils'
 import type { MoodCheckin, StressTrigger } from '@/lib/types'
 
-export const runtime = 'nodejs'
+export const runtime = 'edge'
 
 export async function POST(req: Request) {
   try {
@@ -42,6 +42,7 @@ export async function POST(req: Request) {
     try {
       const jsonMatch = raw.match(/\[[\s\S]*\]/)
       if (jsonMatch) recommendations = JSON.parse(jsonMatch[0])
+      else recommendations = [raw]
     } catch {
       recommendations = [raw]
     }

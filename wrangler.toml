@@ -1,6 +1,10 @@
 name = "sentio"
 compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
 
+# Secrets (GEMINI_API_KEY, SUPABASE_SERVICE_ROLE_KEY) → Cloudflare Pages dashboard
+# Settings → Environment variables → Production + Preview (encrypt secrets)
+
 [vars]
-# Set secrets in Cloudflare Pages dashboard — do not commit tokens here.
+GEMINI_MODEL = "gemini-flash-latest"

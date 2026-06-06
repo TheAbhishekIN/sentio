@@ -24,6 +24,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
 }
 
+export const runtime = 'edge'
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>

@@ -75,6 +75,8 @@ export async function upsertInsight(
   return mapInsight(data)
 }
 
+export { mapInsight }
+
 export async function saveCopingSession(
   supabase: SupabaseClient,
   session: {

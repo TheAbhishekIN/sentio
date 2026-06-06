@@ -4,7 +4,7 @@ import { updateAiReflection } from '@/lib/db/checkins'
 import { buildJournalReflectionPrompt } from '@/lib/prompts'
 import { createClient } from '@/utils/supabase/server'
 
-export const runtime = 'nodejs'
+export const runtime = 'edge'
 
 export async function POST(req: Request) {
   try {

@@ -1,7 +1,3 @@
-import { loadEnvConfig } from '@next/env'
-import { readFileSync } from 'fs'
-import { join } from 'path'
-
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
@@ -14,63 +10,15 @@ type GeminiResponse = {
   error?: { message?: string; code?: number; status?: string }
 }
 
-let envLoaded = false
-
-/** Read a key from .env files on disk — wins over stale process.env in local dev. */
-export function readEnvFileKey(key: string): string | undefined {
-  const cwd = process.cwd()
-  for (const file of ['.env.local', '.env.development.local', '.env.development', '.env']) {
-    try {
-      const content = readFileSync(join(cwd, file), 'utf8')
-      for (const line of content.split('\n')) {
-        const trimmed = line.trim()
-        if (!trimmed || trimmed.startsWith('#')) continue
-        const eq = trimmed.indexOf('=')
-        if (eq === -1) continue
-        const k = trimmed.slice(0, eq).trim()
-        let v = trimmed.slice(eq + 1).trim()
-        if (
-          (v.startsWith('"') && v.endsWith('"')) ||
-          (v.startsWith("'") && v.endsWith("'"))
-        ) {
-          v = v.slice(1, -1)
-        }
-        if (k === key && v) return v
-      }
-    } catch {
-      // file missing — try next
-    }
-  }
-  return undefined
-}
-
-function ensureEnvLoaded() {
-  if (envLoaded) return
-  // Stale empty values from a former next.config `env` block block .env.local from loading.
-  if (process.env.GEMINI_API_KEY === '') delete process.env.GEMINI_API_KEY
-  if (process.env.GOOGLE_API_KEY === '') delete process.env.GOOGLE_API_KEY
-  loadEnvConfig(process.cwd(), process.env.NODE_ENV !== 'production')
-  envLoaded = true
-}
-
 function getGeminiConfig() {
-  ensureEnvLoaded()
-
   const apiKey = (
-    readEnvFileKey('GEMINI_API_KEY') ??
-    readEnvFileKey('GOOGLE_API_KEY') ??
-    process.env['GEMINI_API_KEY'] ??
-    process.env['GOOGLE_API_KEY']
+    process.env['GEMINI_API_KEY'] ?? process.env['GOOGLE_API_KEY']
   )?.trim()
-  const model = (
-    readEnvFileKey('GEMINI_MODEL') ??
-    process.env.GEMINI_MODEL ??
-    'gemini-flash-latest'
-  ).trim()
+  const model = (process.env.GEMINI_MODEL ?? 'gemini-flash-latest').trim()
 
   if (!apiKey) {
     throw new Error(
-      'Missing GEMINI_API_KEY — add it to .env.local (not .env.example) and restart the dev server'
+      'Missing GEMINI_API_KEY — set it in .env.local (dev) or Cloudflare Pages secrets (production)'
     )
   }
 
@@ -117,7 +65,7 @@ function extractGeminiText(data: GeminiResponse): string {
 }
 
 /**
- * Google Gemini generateContent API (server-side only).
+ * Google Gemini generateContent API (edge-compatible — Cloudflare Workers / Pages).
  */
 export async function callAI(
   messages: ChatMessage[],

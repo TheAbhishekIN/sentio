@@ -11,7 +11,7 @@ import {
 import { buildInsightChatSystemPrompt } from '@/lib/prompts'
 import { createClient } from '@/utils/supabase/server'
 
-export const runtime = 'nodejs'
+export const runtime = 'edge'
 
 function parseMessages(raw: unknown): InsightChatMessage[] {
   if (!Array.isArray(raw)) return []

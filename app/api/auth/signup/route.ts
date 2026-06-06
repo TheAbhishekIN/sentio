@@ -12,6 +12,12 @@ async function signInAndRespond(
   userId: string,
   name: string
 ) {
+  const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+
+  if (signInError) {
+    return Response.json({ error: mapAuthError(signInError.message) }, { status: 401 })
+  }
+
   await upsertProfile(supabase, {
     id: userId,
     name,
@@ -23,15 +29,71 @@ async function signInAndRespond(
     onboardingComplete: false,
     examDate: null,
     lastCheckinDate: null,
-  })
-
-  const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-
-  if (signInError) {
-    return Response.json({ error: mapAuthError(signInError.message) }, { status: 401 })
-  }
+  }).catch(() => {})
 
   return Response.json({ success: true })
+}
+
+async function createUserViaEdgeFunction(
+  email: string,
+  password: string,
+  name: string
+): Promise<{ userId: string } | { error: string; status: number }> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+
+  if (!supabaseUrl || !publishableKey) {
+    return { error: 'Server configuration error', status: 500 }
+  }
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/auth-signup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${publishableKey}`,
+    },
+    body: JSON.stringify({ email, password, name }),
+  })
+
+  const data = (await res.json()) as { userId?: string; error?: string }
+
+  if (!res.ok) {
+    return { error: data.error ?? 'Could not create account', status: res.status }
+  }
+
+  if (!data.userId) {
+    return { error: 'Could not create account', status: 500 }
+  }
+
+  return { userId: data.userId }
+}
+
+async function createUserWithAdmin(
+  email: string,
+  password: string,
+  name: string
+): Promise<{ userId: string } | { error: string; status: number }> {
+  const admin = createServiceClient()
+
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { name },
+  })
+
+  if (createError) {
+    if (createError.message.toLowerCase().includes('already')) {
+      return { error: 'Email already in use. Try logging in.', status: 409 }
+    }
+    return { error: mapAuthError(createError.message), status: 400 }
+  }
+
+  if (!created.user) {
+    return { error: 'Could not create account', status: 500 }
+  }
+
+  return { userId: created.user.id }
 }
 
 export async function POST(req: Request) {
@@ -49,90 +111,16 @@ export async function POST(req: Request) {
 
     const cookieStore = await cookies()
     const supabase = createClient(cookieStore)
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    // Preferred: admin createUser skips confirmation emails entirely (no rate limit)
-    if (serviceKey) {
-      const admin = createServiceClient()
+    const created = process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? await createUserWithAdmin(email, password, trimmedName)
+      : await createUserViaEdgeFunction(email, password, trimmedName)
 
-      const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { name: trimmedName },
-      })
-
-      if (createError) {
-        if (createError.message.toLowerCase().includes('already')) {
-          return Response.json({ error: 'Email already in use. Try logging in.' }, { status: 409 })
-        }
-        return Response.json({ error: mapAuthError(createError.message) }, { status: 400 })
-      }
-
-      if (!created.user) {
-        return Response.json({ error: 'Could not create account' }, { status: 500 })
-      }
-
-      return signInAndRespond(supabase, email, password, created.user.id, trimmedName)
+    if ('error' in created) {
+      return Response.json({ error: created.error }, { status: created.status })
     }
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name: trimmedName } },
-    })
-
-    if (signUpError) {
-      const isRateLimit =
-        signUpError.message.toLowerCase().includes('rate limit') ||
-        signUpError.message.toLowerCase().includes('over_email_send')
-
-      if (isRateLimit) {
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-
-        if (!signInError && signInData.user) {
-          return signInAndRespond(
-            supabase,
-            email,
-            password,
-            signInData.user.id,
-            trimmedName
-          )
-        }
-
-        return Response.json({
-          error:
-            'Email rate limit reached, but your account may exist. Try logging in, or add SUPABASE_SERVICE_ROLE_KEY to skip confirmation emails.',
-        }, { status: 429 })
-      }
-
-      return Response.json({ error: mapAuthError(signUpError.message) }, { status: 400 })
-    }
-
-    if (!data.user) {
-      return Response.json({ error: 'Could not create account' }, { status: 500 })
-    }
-
-    if (data.session) {
-      return signInAndRespond(supabase, email, password, data.user.id, trimmedName)
-    }
-
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (!signInError && signInData.user) {
-      return signInAndRespond(supabase, email, password, signInData.user.id, trimmedName)
-    }
-
-    return Response.json({
-      error:
-        'Account may have been created but email confirmation is required. Add SUPABASE_SERVICE_ROLE_KEY to .env.local to enable instant signup, or disable "Confirm email" in Supabase Dashboard → Authentication → Providers → Email.',
-    }, { status: 403 })
+    return await signInAndRespond(supabase, email, password, created.userId, trimmedName)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Signup failed'
     return Response.json({ error: message }, { status: 500 })
